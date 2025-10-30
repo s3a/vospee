@@ -269,6 +269,37 @@
             cursor: pointer;
             font-size: 12px;
         }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin: 16px 0;
+            padding: 12px;
+            background-color: var(--secondary-bg);
+            border-radius: 8px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-color);
+        }
+
+        .checkbox-label {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .feature-description {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        [data-theme="dark"] .feature-description {
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
@@ -298,6 +329,14 @@
             <div class="preview" id="audioPreview"></div>
         </div>
         
+        <div class="checkbox-group">
+            <input type="checkbox" id="transcribeWithTopics">
+            <div class="checkbox-label">
+                <div>Транскрибировать с выделением тем и таймкодами</div>
+                <div class="feature-description">Включите эту опцию для получения структурированной транскрипции с разбивкой по темам и временными метками. Это улучшит обработку контента нейросетями.</div>
+            </div>
+        </div>
+        
         <button class="submit-btn" id="audioSubmit">Отправить</button>
         
         <div class="timer-info" id="timerInfo">
@@ -319,7 +358,7 @@
         // Конфигурация приложения
         const CONFIG = {
             // ЗАМЕНИТЕ НА ВАШ ВЕБХУК
-            webhookUrl: 'https://n8n.s3amat.ru/webhook-test/tghookVosp',
+            webhookUrl: 'https://n8n.s3amat.ru/webhook-test/gog3n',
             // Время до удаления файла (в миллисекундах)
             fileExpirationTime: 60 * 60 * 1000 // 60 минут
         };
@@ -671,12 +710,17 @@
                 // Добавляем режим работы
                 formData.append('mode', 'audio_upload');
                 
+                // Добавляем информацию о транскрипции с темами и таймкодами
+                const transcribeWithTopics = document.getElementById('transcribeWithTopics').checked;
+                formData.append('transcribe_with_topics', transcribeWithTopics);
+                
                 showLoading();
                 
                 // Отправка на вебхук
                 console.log('Отправка данных на вебхук:', CONFIG.webhookUrl, {
                     chat_id: currentChatId,
-                    mode: 'audio_upload'
+                    mode: 'audio_upload',
+                    transcribe_with_topics: transcribeWithTopics
                 });
                 
                 // Реальная отправка на вебхук
@@ -699,6 +743,7 @@
                         // Очищаем форму
                         document.getElementById('audioFile').value = '';
                         document.getElementById('audioPreview').innerHTML = '';
+                        document.getElementById('transcribeWithTopics').checked = false;
                     } else {
                         showMessage(`Ошибка сервера: ${response.status}`, true);
                     }
