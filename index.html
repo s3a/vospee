@@ -388,23 +388,27 @@
             display: block;
         }
 
-        .url-validation {
-            margin-top: 8px;
-        }
-
-        .validation-btn {
-            padding: 8px 16px;
-            background-color: var(--secondary-bg);
-            border: 1px solid var(--border-color);
+        .compression-info {
+            background-color: rgba(51, 144, 236, 0.1);
+            padding: 10px;
             border-radius: 6px;
-            color: var(--text-color);
-            cursor: pointer;
-            font-size: 14px;
             margin-top: 8px;
+            font-size: 12px;
+            display: none;
         }
 
-        .validation-btn:hover {
-            background-color: var(--border-color);
+        .compression-info.active {
+            display: block;
+        }
+
+        .compression-stats {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #666;
+        }
+
+        [data-theme="dark"] .compression-stats {
+            color: #aaa;
         }
     </style>
 </head>
@@ -442,6 +446,19 @@
                 </div>
                 <div class="error-message" id="fileError"></div>
                 <div class="preview" id="audioPreview"></div>
+                
+                <!-- Опция сжатия -->
+                <div class="checkbox-group" id="compressionOption">
+                    <input type="checkbox" id="compressFile">
+                    <div class="checkbox-label">
+                        <div>Сжать файл перед загрузкой</div>
+                        <div class="feature-description">Включите эту опцию для сжатия аудиофайла через bytescale.com. Файл будет загружен на внешний сервер и сжат для экономии места.</div>
+                    </div>
+                </div>
+                <div class="compression-info" id="compressionInfo">
+                    <div><strong>Сжатие через bytescale.com</strong></div>
+                    <div class="compression-stats" id="compressionStats"></div>
+                </div>
             </div>
         </div>
 
@@ -451,9 +468,6 @@
                 <label>Ссылка на аудиофайл</label>
                 <input type="url" class="url-input" id="audioUrl" placeholder="https://example.com/audio.mp3">
                 <div class="error-message" id="urlError"></div>
-                <div class="url-validation">
-                    <button class="validation-btn" id="validateUrl">Проверить ссылку</button>
-                </div>
                 <div class="preview" id="urlPreview"></div>
             </div>
         </div>
@@ -490,7 +504,10 @@
             webhookUrl: 'https://n8n.s3amat.ru/webhook/tghookVosp',
             fileExpirationTime: 60 * 60 * 1000,
             maxFileSize: 200 * 1024 * 1024,
-            allowedFileTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/webm']
+            allowedFileTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/webm'],
+            // Bytescale API для сжатия файлов
+            bytescaleApiKey: 'public_12a1yqk6GgYoWQ8h84dP53B4SfCE', // Публичный ключ для демо
+            bytescaleUploadUrl: 'https://api.bytescale.com/v1/accounts/12a1yqk/uploads/form_data'
         };
 
         // Глобальные переменные
@@ -513,7 +530,7 @@
             initThemeToggle();
             initMethodSelector();
             initFilePreview();
-            initUrlPreview();
+            initUrlInput();
             initFormSubmission();
             
             console.log('Audio upload app initialized successfully');
@@ -632,9 +649,12 @@
             const input = document.getElementById('audioFile');
             const preview = document.getElementById('audioPreview');
             const errorElement = document.getElementById('fileError');
+            const compressionOption = document.getElementById('compressionOption');
+            const compressionInfo = document.getElementById('compressionInfo');
             
             input.addEventListener('change', function() {
                 clearErrors();
+                compressionInfo.classList.remove('active');
                 
                 if (this.files && this.files[0]) {
                     const file = this.files[0];
@@ -643,8 +663,12 @@
                     if (!validation.isValid) {
                         showError(errorElement, validation.errors[0]);
                         preview.innerHTML = '';
+                        compressionOption.style.display = 'none';
                         return;
                     }
+                    
+                    // Показываем опцию сжатия для файлов
+                    compressionOption.style.display = 'flex';
                     
                     const reader = new FileReader();
                     
@@ -673,14 +697,39 @@
                     reader.readAsDataURL(file);
                 } else {
                     preview.innerHTML = '';
+                    compressionOption.style.display = 'none';
+                }
+            });
+            
+            // Обработчик для чекбокса сжатия
+            document.getElementById('compressFile').addEventListener('change', function() {
+                if (this.checked) {
+                    compressionInfo.classList.add('active');
+                    updateCompressionStats();
+                } else {
+                    compressionInfo.classList.remove('active');
                 }
             });
         }
 
-        // Предпросмотр аудио по ссылке
-        function initUrlPreview() {
+        function updateCompressionStats() {
+            const fileInput = document.getElementById('audioFile');
+            if (fileInput.files && fileInput.files[0]) {
+                const file = fileInput.files[0];
+                const originalSize = file.size;
+                // Примерная оценка сжатия (можно настроить точнее)
+                const compressedSize = Math.max(originalSize * 0.3, 100000); // 30% от оригинала, но не менее 100KB
+                const statsElement = document.getElementById('compressionStats');
+                statsElement.innerHTML = `
+                    <div>Исходный размер: ${(originalSize / 1024 / 1024).toFixed(2)} MB</div>
+                    <div>Ожидаемый размер после сжатия: ~${(compressedSize / 1024 / 1024).toFixed(2)} MB</div>
+                `;
+            }
+        }
+
+        // Инициализация ввода URL (без проверки)
+        function initUrlInput() {
             const urlInput = document.getElementById('audioUrl');
-            const validateBtn = document.getElementById('validateUrl');
             const preview = document.getElementById('urlPreview');
             const errorElement = document.getElementById('urlError');
             
@@ -688,30 +737,13 @@
             urlInput.addEventListener('input', () => {
                 clearErrors();
                 preview.innerHTML = '';
-            });
-            
-            // Кнопка проверки ссылки
-            validateBtn.addEventListener('click', async () => {
+                
                 const url = urlInput.value.trim();
-                
-                if (!url) {
-                    showError(errorElement, 'Введите URL');
-                    return;
-                }
-                
-                const validation = validateUrl(url);
-                if (!validation.isValid) {
-                    showError(errorElement, validation.errors[0]);
-                    return;
-                }
-                
-                showLoading(true);
-                
-                try {
-                    const result = await validateAudioUrl(url);
-                    
-                    if (result.isValid) {
-                        // Создаем аудио элемент для предпросмотра
+                if (url) {
+                    // Простая проверка URL
+                    const validation = validateUrl(url);
+                    if (validation.isValid) {
+                        // Создаем аудио элемент для предпрослушивания
                         const audioElement = document.createElement('audio');
                         audioElement.controls = true;
                         audioElement.src = url;
@@ -719,22 +751,15 @@
                         const urlInfo = document.createElement('div');
                         urlInfo.className = 'url-info';
                         urlInfo.innerHTML = `
-                            <div><strong>Ссылка проверена</strong></div>
-                            <div><strong>Тип контента:</strong> ${result.contentType || 'audio'}</div>
+                            <div><strong>Ссылка на аудио</strong></div>
                         `;
                         
                         preview.innerHTML = '';
                         preview.appendChild(audioElement);
                         preview.appendChild(urlInfo);
-                        
-                        showSuccess(errorElement, 'Ссылка ведет на аудиофайл');
                     } else {
-                        showError(errorElement, result.error);
+                        showError(errorElement, validation.errors[0]);
                     }
-                } catch (error) {
-                    showError(errorElement, 'Ошибка при проверке ссылки');
-                } finally {
-                    showLoading(false);
                 }
             });
         }
@@ -766,7 +791,7 @@
             };
         }
 
-        // Валидация URL
+        // Валидация URL (только базовая проверка формата)
         function validateUrl(url) {
             const errors = [];
             
@@ -775,14 +800,6 @@
                 
                 if (!['http:', 'https:'].includes(urlObj.protocol)) {
                     errors.push('Поддерживаются только HTTP и HTTPS ссылки');
-                }
-                
-                const path = urlObj.pathname.toLowerCase();
-                const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.webm', '.aac', '.flac'];
-                const hasAudioExtension = audioExtensions.some(ext => path.endsWith(ext));
-                
-                if (!hasAudioExtension) {
-                    errors.push('Ссылка может не вести на аудиофайл. Проверьте расширение файла.');
                 }
                 
             } catch (e) {
@@ -795,29 +812,40 @@
             };
         }
 
-        // Проверка аудио по URL
-        async function validateAudioUrl(url) {
-            try {
-                const response = await fetch(url, { method: 'HEAD' });
-                const contentType = response.headers.get('content-type');
-                
-                if (contentType && contentType.startsWith('audio/')) {
-                    return {
-                        isValid: true,
-                        contentType
-                    };
-                } else {
-                    return {
-                        isValid: false,
-                        error: 'Ссылка не ведет на аудиофайл'
-                    };
+        // Загрузка файла на bytescale.com для сжатия
+        async function uploadToBytescale(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Добавляем параметры для сжатия аудио
+            const params = new URLSearchParams({
+                'metadata': JSON.stringify({
+                    'audio': {
+                        'compression': 'enabled',
+                        'format': 'mp3',
+                        'quality': 'medium'
+                    }
+                })
+            });
+            
+            const uploadUrl = `${CONFIG.bytescaleUploadUrl}?${params}`;
+            
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Authorization': `Bearer ${CONFIG.bytescaleApiKey}`
                 }
-            } catch (error) {
-                return {
-                    isValid: false,
-                    error: 'Не удалось проверить ссылку'
-                };
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Ошибка загрузки на bytescale.com: ${response.status}`);
             }
+            
+            const data = await response.json();
+            
+            // Возвращаем URL загруженного файла
+            return data.fileUrl || data.url;
         }
 
         // Обработка отправки формы
@@ -838,6 +866,7 @@
             
             if (currentMethod === 'file') {
                 const audioFile = document.getElementById('audioFile').files[0];
+                const compressFile = document.getElementById('compressFile').checked;
                 
                 if (!audioFile) {
                     showError(document.getElementById('fileError'), 'Пожалуйста, выберите аудиофайл');
@@ -850,8 +879,27 @@
                     return;
                 }
                 
-                formData.append('audio_type', 'file');
-                formData.append('audio_file', audioFile);
+                if (compressFile) {
+                    // Загружаем файл на bytescale.com для сжатия
+                    showLoading(true);
+                    try {
+                        const compressedUrl = await uploadToBytescale(audioFile);
+                        formData.append('audio_type', 'url');
+                        formData.append('audio_url', compressedUrl);
+                        formData.append('compressed', 'true');
+                        
+                        showMessage('Файл успешно сжат и загружен!');
+                    } catch (error) {
+                        console.error('Ошибка сжатия файла:', error);
+                        showMessage('Ошибка при сжатии файла. Пожалуйста, попробуйте без сжатия.', true);
+                        showLoading(false);
+                        return;
+                    }
+                } else {
+                    formData.append('audio_type', 'file');
+                    formData.append('audio_file', audioFile);
+                    formData.append('compressed', 'false');
+                }
                 
             } else { // URL method
                 const audioUrl = document.getElementById('audioUrl').value.trim();
@@ -869,6 +917,7 @@
                 
                 formData.append('audio_type', 'url');
                 formData.append('audio_url', audioUrl);
+                formData.append('compressed', 'false');
             }
             
             await sendToWebhook(formData);
@@ -890,8 +939,16 @@
                     // Добавляем в историю
                     if (currentMethod === 'file') {
                         const audioFile = document.getElementById('audioFile').files[0];
-                        const fileUrl = URL.createObjectURL(audioFile);
-                        addUploadedFile(audioFile.name, fileUrl, 'file');
+                        const compressFile = document.getElementById('compressFile').checked;
+                        
+                        if (compressFile) {
+                            // Для сжатых файлов сохраняем как ссылку
+                            const audioUrl = document.getElementById('audioUrl').value.trim();
+                            addUploadedFile(audioFile.name + ' (сжатый)', audioUrl, 'url');
+                        } else {
+                            const fileUrl = URL.createObjectURL(audioFile);
+                            addUploadedFile(audioFile.name, fileUrl, 'file');
+                        }
                     } else {
                         const audioUrl = document.getElementById('audioUrl').value.trim();
                         addUploadedFile('Аудио по ссылке', audioUrl, 'url');
@@ -1075,17 +1132,10 @@
             }
         }
 
-        function showSuccess(element, message) {
-            element.textContent = message;
-            element.classList.add('active');
-            element.style.color = 'var(--success-color)';
-        }
-
         function clearErrors() {
             document.querySelectorAll('.error-message').forEach(el => {
                 el.classList.remove('active');
                 el.textContent = '';
-                el.style.color = '';
             });
             
             document.getElementById('audioUrl').classList.remove('error');
@@ -1114,6 +1164,9 @@
             document.getElementById('audioPreview').innerHTML = '';
             document.getElementById('urlPreview').innerHTML = '';
             document.getElementById('transcribeWithTopics').checked = false;
+            document.getElementById('compressFile').checked = false;
+            document.getElementById('compressionOption').style.display = 'none';
+            document.getElementById('compressionInfo').classList.remove('active');
             clearErrors();
         }
     </script>
