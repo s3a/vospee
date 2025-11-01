@@ -944,7 +944,7 @@
                         if (compressFile) {
                             // Для сжатых файлов сохраняем как ссылку
                             const audioUrl = document.getElementById('audioUrl').value.trim();
-                            addUploadedFile(audioFile.name + ' (сжатый)', audioUrl, 'url');
+                            addUploadedFile(audioFile.name + ' (сжатый)', substitute(audioUrl,"raw","audio")+"?br=32", 'url');
                         } else {
                             const fileUrl = URL.createObjectURL(audioFile);
                             addUploadedFile(audioFile.name, fileUrl, 'file');
