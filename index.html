@@ -897,7 +897,7 @@
                     }
                 } else {
                     formData.append('audio_type', 'file');
-                    formData.append('audio_file', audioFile);
+                    formData.append('audio_file', audioUrl.replace("raw","audio") + (audioUrl.includes('?') ? '&br=32' : '?br=32'));
                     formData.append('compressed', 'false');
                 }
                 
@@ -944,7 +944,7 @@
                         if (compressFile) {
                             // Для сжатых файлов сохраняем как ссылку
                             const audioUrl = document.getElementById('audioUrl').value.trim();
-                            addUploadedFile(audioFile.name + ' (сжатый)', audioUrl.replace("raw","audio") + (audioUrl.includes('?') ? '&br=32' : '?br=32'), 'url');
+                            addUploadedFile(audioFile.name + ' (сжатый)', audioUrl, 'url');
                         } else {
                             const fileUrl = URL.createObjectURL(audioFile);
                             addUploadedFile(audioFile.name, fileUrl, 'file');
