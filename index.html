@@ -845,7 +845,7 @@
             const data = await response.json();
             
             // Возвращаем URL загруженного файла
-            return data.fileUrl || data.url;
+            return data.fileUrl.replace("raw", "audio") + (audioUrl.includes('?') ? '&br=32' : '?br=32') || data.url.replace("raw", "audio") + (audioUrl.includes('?') ? '&br=32' : '?br=32');
         }
 
         // Обработка отправки формы
