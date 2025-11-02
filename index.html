@@ -454,411 +454,589 @@
 
     <script>
         // Глобальные переменные
-        let currentChatId = null;
-        let uploadedFiles = [];
-        let activeTimers = {};
-        let currentMethod = 'binary';
+let currentChatId = null;
+let uploadedFiles = [];
+let activeTimers = {};
+let currentMethod = 'binary';
 
-        // Ждем полной загрузки DOM
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing app...');
-            
-            // Проверяем загрузку конфигурации
-            if (!window.CONFIG) {
-                console.error('Конфигурация не загружена!');
-                showMessage('Ошибка загрузки конфигурации', true);
-                return;
-            }
+// Ждем полной загрузки DOM
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing app...');
+    
+    // Проверяем загрузку конфигурации
+    if (!window.CONFIG) {
+        console.error('Конфигурация не загружена!');
+        showMessage('Ошибка загрузки конфигурации', true);
+        return;
+    }
 
-            console.log('Configuration loaded:', {
-                webhookUrl: window.CONFIG.webhookUrl ? '***' : 'missing',
-                bytescaleApiKey: window.CONFIG.bytescaleApiKey ? '***' : 'missing',
-                bytescaleUploadUrl: window.CONFIG.bytescaleUploadUrl ? '***' : 'missing'
-            });
-            
-            // Загружаем список файлов из localStorage
-            loadUploadedFiles();
-            
-            // Инициализация методов загрузки
-            initUploadMethods();
-            
-            // Инициализация Telegram Web App
-            initTelegramWebApp();
-            
-            // Инициализация темы
-            initTheme();
+    console.log('Configuration loaded:', {
+        webhookUrl: window.CONFIG.webhookUrl ? '***' : 'missing',
+        bytescaleApiKey: window.CONFIG.bytescaleApiKey ? '***' : 'missing',
+        bytescaleUploadUrl: window.CONFIG.bytescaleUploadUrl ? '***' : 'missing'
+    });
+    
+    // Загружаем список файлов из localStorage
+    loadUploadedFiles();
+    
+    // Инициализация методов загрузки
+    initUploadMethods();
+    
+    // Инициализация Telegram Web App
+    initTelegramWebApp();
+    
+    // Инициализация темы
+    initTheme();
 
-            // Инициализация предпросмотра аудио
-            setupAudioPreview();
-            
-            console.log('Audio upload app initialized successfully');
+    // Инициализация предпросмотра аудио
+    setupAudioPreview();
+    
+    console.log('Audio upload app initialized successfully');
+});
+
+// Инициализация методов загрузки
+function initUploadMethods() {
+    const methodTabs = document.querySelectorAll('.method-tab');
+    console.log('Found method tabs:', methodTabs.length);
+    
+    methodTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const method = this.getAttribute('data-method');
+            console.log('Switching to method:', method);
+            switchMethod(method);
         });
+    });
 
-        // Инициализация методов загрузки
-        function initUploadMethods() {
-            const methodTabs = document.querySelectorAll('.method-tab');
-            
-            methodTabs.forEach(tab => {
-                tab.addEventListener('click', function() {
-                    const method = this.getAttribute('data-method');
-                    switchMethod(method);
-                });
-            });
+    // Обработчик отправки формы
+    const audioSubmit = document.getElementById('audioSubmit');
+    if (audioSubmit) {
+        audioSubmit.addEventListener('click', handleSubmit);
+    }
+}
 
-            // Обработчик отправки формы
-            const audioSubmit = document.getElementById('audioSubmit');
-            if (audioSubmit) {
-                audioSubmit.addEventListener('click', handleSubmit);
-            }
-        }
+// Переключение между методами загрузки
+function switchMethod(method) {
+    currentMethod = method;
+    
+    // Обновляем активные табы
+    document.querySelectorAll('.method-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`[data-method="${method}"]`).classList.add('active');
+    
+    // Обновляем активный контент
+    document.querySelectorAll('.method-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById(`${method}-method`).classList.add('active');
+}
 
-        // Переключение между методами загрузки
-        function switchMethod(method) {
-            currentMethod = method;
+// Функция для получения chat_id из Telegram Web App
+function initTelegramWebApp() {
+    if (window.Telegram && Telegram.WebApp) {
+        try {
+            Telegram.WebApp.ready();
+            const initDataUnsafe = Telegram.WebApp.initDataUnsafe || {};
             
-            // Обновляем активные табы
-            document.querySelectorAll('.method-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelector(`[data-method="${method}"]`).classList.add('active');
-            
-            // Обновляем активный контент
-            document.querySelectorAll('.method-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.getElementById(`${method}-method`).classList.add('active');
-        }
-
-        // Функция для получения chat_id из Telegram Web App
-        function initTelegramWebApp() {
-            if (window.Telegram && Telegram.WebApp) {
-                try {
-                    Telegram.WebApp.ready();
-                    const initDataUnsafe = Telegram.WebApp.initDataUnsafe || {};
-                    
-                    if (initDataUnsafe.chat) {
-                        currentChatId = initDataUnsafe.chat.id;
-                    } else if (initDataUnsafe.user) {
-                        currentChatId = initDataUnsafe.user.id;
-                    }
-                    
-                    console.log('Chat ID detected:', currentChatId);
-                    Telegram.WebApp.expand();
-                    
-                } catch (error) {
-                    console.error('Error initializing Telegram Web App:', error);
-                    // Режим разработки
-                    const urlParams = new URLSearchParams(window.location.search);
-                    currentChatId = urlParams.get('chat_id') || 'dev_chat_id';
-                }
-            } else {
-                // Режим разработки
-                const urlParams = new URLSearchParams(window.location.search);
-                currentChatId = urlParams.get('chat_id') || 'dev_chat_id';
-                console.log('Running in development mode. Chat ID:', currentChatId);
-            }
-        }
-
-        // Инициализация темы
-        function initTheme() {
-            const themeToggle = document.getElementById('themeToggle');
-            const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-            
-            const currentTheme = localStorage.getItem('theme') || 
-                                (prefersDarkScheme.matches ? 'dark' : 'light');
-            
-            if (currentTheme === 'dark') {
-                document.body.setAttribute('data-theme', 'dark');
-                themeToggle.textContent = '☀️';
-            } else {
-                document.body.removeAttribute('data-theme');
-                themeToggle.textContent = '🌙';
+            if (initDataUnsafe.chat) {
+                currentChatId = initDataUnsafe.chat.id;
+            } else if (initDataUnsafe.user) {
+                currentChatId = initDataUnsafe.user.id;
             }
             
-            themeToggle.addEventListener('click', () => {
-                if (document.body.hasAttribute('data-theme')) {
-                    document.body.removeAttribute('data-theme');
-                    localStorage.setItem('theme', 'light');
-                    themeToggle.textContent = '🌙';
-                } else {
-                    document.body.setAttribute('data-theme', 'dark');
-                    localStorage.setItem('theme', 'dark');
-                    themeToggle.textContent = '☀️';
-                }
-            });
-        }
-
-        // Предпросмотр загруженных аудиофайлов
-        function setupAudioPreview() {
-            const inputs = [
-                { input: 'audioFile', preview: 'audioPreview' },
-                { input: 'bytescaleFile', preview: 'bytescalePreview' }
-            ];
+            console.log('Chat ID detected:', currentChatId);
+            Telegram.WebApp.expand();
             
-            inputs.forEach(({ input, preview }) => {
-                const inputElement = document.getElementById(input);
-                const previewElement = document.getElementById(preview);
+        } catch (error) {
+            console.error('Error initializing Telegram Web App:', error);
+            // Режим разработки
+            const urlParams = new URLSearchParams(window.location.search);
+            currentChatId = urlParams.get('chat_id') || 'dev_chat_id';
+        }
+    } else {
+        // Режим разработки
+        const urlParams = new URLSearchParams(window.location.search);
+        currentChatId = urlParams.get('chat_id') || 'dev_chat_id';
+        console.log('Running in development mode. Chat ID:', currentChatId);
+    }
+}
+
+// Инициализация темы
+function initTheme() {
+    const themeToggle = document.getElementById('themeToggle');
+    if (!themeToggle) {
+        console.error('Theme toggle button not found!');
+        return;
+    }
+
+    const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    // Проверяем сохраненную тему или системные настройки
+    const currentTheme = localStorage.getItem('theme') || 
+                        (prefersDarkScheme.matches ? 'dark' : 'light');
+    
+    // Применяем тему
+    if (currentTheme === 'dark') {
+        document.body.setAttribute('data-theme', 'dark');
+        themeToggle.textContent = '☀️';
+    } else {
+        document.body.removeAttribute('data-theme');
+        themeToggle.textContent = '🌙';
+    }
+    
+    // Обработчик переключения темы
+    themeToggle.addEventListener('click', function() {
+        if (document.body.hasAttribute('data-theme')) {
+            document.body.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
+            themeToggle.textContent = '🌙';
+        } else {
+            document.body.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+            themeToggle.textContent = '☀️';
+        }
+    });
+}
+
+// Предпросмотр загруженных аудиофайлов
+function setupAudioPreview() {
+    const inputs = [
+        { input: 'audioFile', preview: 'audioPreview' },
+        { input: 'bytescaleFile', preview: 'bytescalePreview' }
+    ];
+    
+    inputs.forEach(({ input, preview }) => {
+        const inputElement = document.getElementById(input);
+        const previewElement = document.getElementById(preview);
+        
+        if (!inputElement || !previewElement) {
+            console.error(`Elements not found: ${input} or ${preview}`);
+            return;
+        }
+        
+        inputElement.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const file = this.files[0];
+                const reader = new FileReader();
                 
-                if (!inputElement || !previewElement) return;
+                reader.onload = function(e) {
+                    const audioElement = document.createElement('audio');
+                    audioElement.controls = true;
+                    audioElement.src = e.target.result;
+                    
+                    const fileInfo = document.createElement('div');
+                    fileInfo.className = 'file-info';
+                    fileInfo.innerHTML = `
+                        <div><strong>Имя файла:</strong> ${file.name}</div>
+                        <div><strong>Размер:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                        <div><strong>Тип:</strong> ${file.type}</div>
+                    `;
+                    
+                    previewElement.innerHTML = '';
+                    previewElement.appendChild(audioElement);
+                    previewElement.appendChild(fileInfo);
+                };
                 
-                inputElement.addEventListener('change', function() {
-                    if (this.files && this.files[0]) {
-                        const file = this.files[0];
-                        const reader = new FileReader();
-                        
-                        reader.onload = function(e) {
-                            const audioElement = document.createElement('audio');
-                            audioElement.controls = true;
-                            audioElement.src = e.target.result;
-                            
-                            const fileInfo = document.createElement('div');
-                            fileInfo.className = 'file-info';
-                            fileInfo.innerHTML = `
-                                <div><strong>Имя файла:</strong> ${file.name}</div>
-                                <div><strong>Размер:</strong> ${(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                                <div><strong>Тип:</strong> ${file.type}</div>
-                            `;
-                            
-                            previewElement.innerHTML = '';
-                            previewElement.appendChild(audioElement);
-                            previewElement.appendChild(fileInfo);
-                        };
-                        
-                        reader.onerror = function() {
-                            console.error('Ошибка при чтении файла');
-                            previewElement.innerHTML = '<p style="color: red;">Ошибка загрузки аудиофайла</p>';
-                        };
-                        
-                        reader.readAsDataURL(file);
-                    } else {
-                        previewElement.innerHTML = '';
-                    }
-                });
-            });
-        }
-
-        // Обработчик отправки формы
-        function handleSubmit() {
-            if (!currentChatId) {
-                showMessage('Chat ID не определен. Невозможно отправить запрос.', true);
-                return;
+                reader.onerror = function() {
+                    console.error('Ошибка при чтении файла');
+                    previewElement.innerHTML = '<p style="color: red;">Ошибка загрузки аудиофайла</p>';
+                };
+                
+                reader.readAsDataURL(file);
+            } else {
+                previewElement.innerHTML = '';
             }
+        });
+    });
+}
 
-            switch (currentMethod) {
-                case 'binary':
-                    handleBinaryUpload();
-                    break;
-                case 'url':
-                    handleUrlUpload();
-                    break;
-                case 'bytescale':
-                    handleBytescaleUpload();
-                    break;
-                default:
-                    showMessage('Неизвестный метод загрузки', true);
-            }
-        }
+// Обработчик отправки формы
+function handleSubmit() {
+    if (!currentChatId) {
+        showMessage('Chat ID не определен. Невозможно отправить запрос.', true);
+        return;
+    }
 
-        // Метод 1: Прямая загрузка binary
-        function handleBinaryUpload() {
-            const audioFile = document.getElementById('audioFile').files[0];
-            
-            if (!audioFile) {
-                showMessage('Пожалуйста, выберите аудиофайл', true);
-                return;
-            }
-            
+    switch (currentMethod) {
+        case 'binary':
+            handleBinaryUpload();
+            break;
+        case 'url':
+            handleUrlUpload();
+            break;
+        case 'bytescale':
+            handleBytescaleUpload();
+            break;
+        default:
+            showMessage('Неизвестный метод загрузки', true);
+    }
+}
+
+// Метод 1: Прямая загрузка binary
+function handleBinaryUpload() {
+    const audioFile = document.getElementById('audioFile').files[0];
+    
+    if (!audioFile) {
+        showMessage('Пожалуйста, выберите аудиофайл', true);
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('audio_file', audioFile);
+    formData.append('upload_method', 'binary');
+    
+    sendToWebhook(formData, audioFile.name);
+}
+
+// Метод 2: Загрузка по ссылке
+function handleUrlUpload() {
+    const audioUrl = document.getElementById('audioUrl').value.trim();
+    
+    if (!audioUrl) {
+        showMessage('Пожалуйста, введите URL аудиофайла', true);
+        return;
+    }
+    
+    if (!isValidUrl(audioUrl)) {
+        showMessage('Пожалуйста, введите корректный URL', true);
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('audio_url', audioUrl);
+    formData.append('upload_method', 'url');
+    
+    // Извлекаем имя файла из URL
+    const fileName = audioUrl.split('/').pop() || 'audio_from_url';
+    
+    sendToWebhook(formData, fileName);
+}
+
+// Метод 3: Загрузка через Bytescale
+async function handleBytescaleUpload() {
+    const audioFile = document.getElementById('bytescaleFile').files[0];
+    
+    if (!audioFile) {
+        showMessage('Пожалуйста, выберите аудиофайл', true);
+        return;
+    }
+
+    if (!window.CONFIG.bytescaleApiKey || !window.CONFIG.bytescaleUploadUrl) {
+        showMessage('Сервис загрузки временно недоступен', true);
+        return;
+    }
+
+    try {
+        showLoading();
+        
+        // Загружаем файл на Bytescale
+        const uploadResponse = await uploadToBytescale(audioFile);
+        
+        if (uploadResponse && uploadResponse.fileUrl) {
             const formData = new FormData();
-            formData.append('audio_file', audioFile);
-            formData.append('upload_method', 'binary');
+            formData.append('audio_url', uploadResponse.fileUrl);
+            formData.append('upload_method', 'bytescale');
+            formData.append('bytescale_data', JSON.stringify({
+                fileId: uploadResponse.fileId,
+                originalFileName: audioFile.name
+            }));
             
             sendToWebhook(formData, audioFile.name);
+        } else {
+            throw new Error('Не удалось загрузить файл на Bytescale');
         }
+    } catch (error) {
+        hideLoading();
+        console.error('Bytescale upload error:', error);
+        showMessage('Ошибка при загрузке файла на сервер сжатия', true);
+    }
+}
 
-        // Метод 2: Загрузка по ссылке
-        function handleUrlUpload() {
-            const audioUrl = document.getElementById('audioUrl').value.trim();
-            
-            if (!audioUrl) {
-                showMessage('Пожалуйста, введите URL аудиофайла', true);
-                return;
-            }
-            
-            if (!isValidUrl(audioUrl)) {
-                showMessage('Пожалуйста, введите корректный URL', true);
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('audio_url', audioUrl);
-            formData.append('upload_method', 'url');
-            
-            // Извлекаем имя файла из URL
-            const fileName = audioUrl.split('/').pop() || 'audio_from_url';
-            
-            sendToWebhook(formData, fileName);
-        }
+// Загрузка файла на Bytescale
+async function uploadToBytescale(file) {
+    const formData = new FormData();
+    formData.append('file', file);
 
-        // Метод 3: Загрузка через Bytescale
-        async function handleBytescaleUpload() {
-            const audioFile = document.getElementById('bytescaleFile').files[0];
+    const response = await fetch(window.CONFIG.bytescaleUploadUrl, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${window.CONFIG.bytescaleApiKey}`
+        },
+        body: formData
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+}
+
+// Вспомогательные функции
+function showLoading() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.classList.add('active');
+    }
+}
+
+function hideLoading() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.classList.remove('active');
+    }
+}
+
+function showMessage(message, isError = false) {
+    if (isError) {
+        alert(`Ошибка: ${message}`);
+    } else {
+        alert(message);
+    }
+}
+
+function isValidUrl(string) {
+    try {
+        new URL(string);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+// Функция для отправки данных на вебхук
+function sendToWebhook(formData, fileName) {
+    if (!window.CONFIG.webhookUrl) {
+        showMessage('Вебхук не настроен', true);
+        return;
+    }
+
+    // Добавляем общие данные
+    formData.append('chat_id', currentChatId);
+    formData.append('mode', 'audio_upload');
+    
+    const transcribeWithTopics = document.getElementById('transcribeWithTopics').checked;
+    formData.append('transcribe_with_topics', transcribeWithTopics);
+    
+    showLoading();
+    
+    console.log('Отправка данных на вебхук:', {
+        chat_id: currentChatId,
+        mode: 'audio_upload',
+        transcribe_with_topics: transcribeWithTopics,
+        upload_method: currentMethod
+    });
+    
+    fetch(window.CONFIG.webhookUrl, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        hideLoading();
+        if (response.ok) {
+            showMessage('Аудиофайл успешно отправлен!');
             
-            if (!audioFile) {
-                showMessage('Пожалуйста, выберите аудиофайл', true);
-                return;
-            }
-
-            if (!window.CONFIG.bytescaleApiKey || !window.CONFIG.bytescaleUploadUrl) {
-                showMessage('Сервис загрузки временно недоступен', true);
-                return;
-            }
-
-            try {
-                showLoading();
+            // Очищаем форму
+            clearForm();
+            
+            // Для binary и bytescale добавляем в список загруженных
+            if (currentMethod === 'binary' || currentMethod === 'bytescale') {
+                const fileUrl = currentMethod === 'binary' ? 
+                    URL.createObjectURL(document.getElementById('audioFile').files[0]) : 
+                    'bytescale_uploaded';
                 
-                // Загружаем файл на Bytescale
-                const uploadResponse = await uploadToBytescale(audioFile);
-                
-                if (uploadResponse && uploadResponse.fileUrl) {
-                    const formData = new FormData();
-                    formData.append('audio_url', uploadResponse.fileUrl);
-                    formData.append('upload_method', 'bytescale');
-                    formData.append('bytescale_data', JSON.stringify({
-                        fileId: uploadResponse.fileId,
-                        originalFileName: audioFile.name
-                    }));
-                    
-                    sendToWebhook(formData, audioFile.name);
-                } else {
-                    throw new Error('Не удалось загрузить файл на Bytescale');
-                }
-            } catch (error) {
-                hideLoading();
-                console.error('Bytescale upload error:', error);
-                showMessage('Ошибка при загрузке файла на сервер сжатия', true);
+                addUploadedFile(fileName, fileUrl);
             }
+        } else {
+            showMessage(`Ошибка сервера: ${response.status}`, true);
         }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Ошибка при отправке:', error);
+        showMessage('Ошибка при отправке запроса', true);
+    });
+}
 
-        // Загрузка файла на Bytescale
-        async function uploadToBytescale(file) {
-            const formData = new FormData();
-            formData.append('file', file);
+function clearForm() {
+    // Очищаем все поля в зависимости от активного метода
+    document.getElementById('audioFile').value = '';
+    document.getElementById('audioUrl').value = '';
+    document.getElementById('bytescaleFile').value = '';
+    document.getElementById('audioPreview').innerHTML = '';
+    document.getElementById('bytescalePreview').innerHTML = '';
+    document.getElementById('transcribeWithTopics').checked = false;
+}
 
-            const response = await fetch(window.CONFIG.bytescaleUploadUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${window.CONFIG.bytescaleApiKey}`
-                },
-                body: formData
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            return await response.json();
-        }
-
-        // Вспомогательные функции (showLoading, hideLoading, showMessage, sendToWebhook и т.д.)
-        // ... остальной код функций остается таким же как в вашем исходном коде ...
-
-        function showLoading() {
-            const loadingIndicator = document.getElementById('loadingIndicator');
-            if (loadingIndicator) {
-                loadingIndicator.classList.add('active');
-            }
+// Функции для работы с таймерами и локальным хранилищем
+function startFileDeletionTimer(fileId, fileName) {
+    const timerInfo = document.getElementById('timerInfo');
+    const timerCountdown = document.getElementById('timerCountdown');
+    
+    // Показываем информацию о таймере
+    if (timerInfo) timerInfo.classList.add('active');
+    
+    // Запускаем таймер для обновления отображения
+    const updateInterval = setInterval(() => {
+        const file = uploadedFiles.find(f => f.id === fileId);
+        if (!file) {
+            clearInterval(updateInterval);
+            return;
         }
         
-        function hideLoading() {
-            const loadingIndicator = document.getElementById('loadingIndicator');
-            if (loadingIndicator) {
-                loadingIndicator.classList.remove('active');
-            }
+        const timeLeft = file.expiresAt - Date.now();
+        if (timeLeft <= 0) {
+            clearInterval(updateInterval);
+            deleteFile(fileId);
+            return;
         }
         
-        function showMessage(message, isError = false) {
-            if (isError) {
-                alert(`Ошибка: ${message}`);
-            } else {
-                alert(message);
-            }
+        const minutes = Math.floor(timeLeft / 60000);
+        const seconds = Math.floor((timeLeft % 60000) / 1000);
+        if (timerCountdown) {
+            timerCountdown.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
         }
+        
+        // Обновляем отображение в списке файлов
+        updateFileTimerDisplay(fileId, minutes, seconds);
+    }, 1000);
+    
+    // Сохраняем ID интервала для этого файла
+    activeTimers[fileId] = updateInterval;
+    
+    // Устанавливаем таймер для фактического удаления
+    setTimeout(() => {
+        deleteFile(fileId);
+    }, 60 * 60 * 1000); // 60 минут
+}
 
-        function isValidUrl(string) {
-            try {
-                new URL(string);
+function updateFileTimerDisplay(fileId, minutes, seconds) {
+    const fileElement = document.querySelector(`[data-file-id="${fileId}"] .file-timer`);
+    if (fileElement) {
+        fileElement.textContent = `Удаление через: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+}
+
+function deleteFile(fileId) {
+    // Очищаем интервал обновления таймера
+    if (activeTimers[fileId]) {
+        clearInterval(activeTimers[fileId]);
+        delete activeTimers[fileId];
+    }
+    
+    // Удаляем файл из массива
+    uploadedFiles = uploadedFiles.filter(file => file.id !== fileId);
+    
+    // Сохраняем изменения
+    saveUploadedFiles();
+    
+    // Обновляем отображение
+    renderUploadedFiles();
+    
+    // Скрываем информацию о таймере, если файлов больше нет
+    if (uploadedFiles.length === 0) {
+        const timerInfo = document.getElementById('timerInfo');
+        if (timerInfo) timerInfo.classList.remove('active');
+    }
+    
+    console.log(`Файл с ID ${fileId} удален`);
+}
+
+function addUploadedFile(fileName, fileUrl) {
+    const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const expiresAt = Date.now() + (60 * 60 * 1000); // 60 минут
+    
+    const newFile = {
+        id: fileId,
+        name: fileName,
+        url: fileUrl,
+        uploadedAt: Date.now(),
+        expiresAt: expiresAt
+    };
+    
+    uploadedFiles.push(newFile);
+    saveUploadedFiles();
+    renderUploadedFiles();
+    
+    // Запускаем таймер удаления
+    startFileDeletionTimer(fileId, fileName);
+    
+    return fileId;
+}
+
+function saveUploadedFiles() {
+    localStorage.setItem('uploadedFiles', JSON.stringify(uploadedFiles));
+}
+
+function loadUploadedFiles() {
+    const savedFiles = localStorage.getItem('uploadedFiles');
+    if (savedFiles) {
+        uploadedFiles = JSON.parse(savedFiles);
+        
+        // Восстанавливаем таймеры для файлов, которые еще не истекли
+        const now = Date.now();
+        uploadedFiles = uploadedFiles.filter(file => {
+            if (file.expiresAt > now) {
+                // Перезапускаем таймер с оставшимся временем
+                const timeLeft = file.expiresAt - now;
+                setTimeout(() => {
+                    deleteFile(file.id);
+                }, timeLeft);
+                
+                // Запускаем интервал обновления отображения
+                startFileDeletionTimer(file.id, file.name);
                 return true;
-            } catch (_) {
-                return false;
             }
-        }
+            return false;
+        });
+        
+        // Сохраняем отфильтрованный список
+        saveUploadedFiles();
+        renderUploadedFiles();
+    }
+}
 
-        // Функция для отправки данных на вебхук
-        function sendToWebhook(formData, fileName) {
-            if (!window.CONFIG.webhookUrl) {
-                showMessage('Вебхук не настроен', true);
-                return;
-            }
-
-            // Добавляем общие данные
-            formData.append('chat_id', currentChatId);
-            formData.append('mode', 'audio_upload');
-            
-            const transcribeWithTopics = document.getElementById('transcribeWithTopics').checked;
-            formData.append('transcribe_with_topics', transcribeWithTopics);
-            
-            showLoading();
-            
-            console.log('Отправка данных на вебхук:', {
-                chat_id: currentChatId,
-                mode: 'audio_upload',
-                transcribe_with_topics: transcribeWithTopics,
-                upload_method: currentMethod
-            });
-            
-            fetch(window.CONFIG.webhookUrl, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                hideLoading();
-                if (response.ok) {
-                    showMessage('Аудиофайл успешно отправлен!');
-                    
-                    // Очищаем форму
-                    clearForm();
-                    
-                    // Для binary и bytescale добавляем в список загруженных
-                    if (currentMethod === 'binary' || currentMethod === 'bytescale') {
-                        const fileUrl = currentMethod === 'binary' ? 
-                            URL.createObjectURL(document.getElementById('audioFile').files[0]) : 
-                            'bytescale_uploaded';
-                        
-                        addUploadedFile(fileName, fileUrl);
-                    }
-                } else {
-                    showMessage(`Ошибка сервера: ${response.status}`, true);
-                }
-            })
-            .catch(error => {
-                hideLoading();
-                console.error('Ошибка при отправке:', error);
-                showMessage('Ошибка при отправке запроса', true);
-            });
-        }
-
-        function clearForm() {
-            // Очищаем все поля в зависимости от активного метода
-            document.getElementById('audioFile').value = '';
-            document.getElementById('audioUrl').value = '';
-            document.getElementById('bytescaleFile').value = '';
-            document.getElementById('audioPreview').innerHTML = '';
-            document.getElementById('bytescalePreview').innerHTML = '';
-            document.getElementById('transcribeWithTopics').checked = false;
-        }
-
-        // Функции для работы с таймерами и локальным хранилищем
-        // ... остаются без изменений как в вашем исходном коде ...
+function renderUploadedFiles() {
+    const container = document.getElementById('uploadedFiles');
+    const list = document.getElementById('uploadedFilesList');
+    
+    if (!container || !list) return;
+    
+    if (uploadedFiles.length === 0) {
+        container.classList.remove('active');
+        return;
+    }
+    
+    container.classList.add('active');
+    
+    list.innerHTML = '';
+    
+    uploadedFiles.forEach(file => {
+        const fileElement = document.createElement('div');
+        fileElement.className = 'file-item';
+        fileElement.setAttribute('data-file-id', file.id);
+        
+        const timeLeft = file.expiresAt - Date.now();
+        const minutes = Math.floor(timeLeft / 60000);
+        const seconds = Math.floor((timeLeft % 60000) / 1000);
+        
+        fileElement.innerHTML = `
+            <div class="file-name">${file.name}</div>
+            <div class="file-timer">Удаление через: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}</div>
+            <button class="delete-btn" data-file-id="${file.id}">Удалить</button>
+        `;
+        
+        list.appendChild(fileElement);
+    });
+    
+    // Добавляем обработчики для кнопок удаления
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const fileId = this.getAttribute('data-file-id');
+            deleteFile(fileId);
+        });
+    });
+}
     </script>
 </body>
 </html>
