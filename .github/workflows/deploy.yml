@@ -1,0 +1,52 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Generate configuration
+      run: |
+        # Создаем папку для билда
+        mkdir -p build
+        
+        # Копируем основные файлы
+        cp index.html build/
+        
+        # Генерируем config.js с подставленными секретами
+        sed -e "s|%%WEBHOOK_URL%%|${{ secrets.WEBHOOK_URL }}|g" \
+            -e "s|%%BYTESCALE_API_KEY%%|${{ secrets.BYTESCALE_API_KEY }}|g" \
+            -e "s|%%BYTESCALE_UPLOAD_URL%%|${{ secrets.BYTESCALE_UPLOAD_URL }}|g" \
+            config.js > build/config.js
+        
+        echo "Configuration generated successfully"
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: ./build
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
