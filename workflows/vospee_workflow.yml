@@ -1,4 +1,4 @@
-name: My First Secure Workflow # Название вашего workflow
+name: vospeeWorkflow # Название вашего workflow
 
 on: # Событие, которое запускает workflow
   push:
