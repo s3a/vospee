@@ -1,0 +1,23 @@
+name: My First Secure Workflow # Название вашего workflow
+
+on: # Событие, которое запускает workflow
+  push:
+    branches: [ "main" ]
+
+jobs:
+  my-job:
+    runs-on: ubuntu-latest # Тип виртуальной машины для выполнения
+    steps:
+      # Шаг 1: Получает код из репозитория
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Шаг 2: Показывает, как использовать секрет
+      - name: Use a secret safely
+        env: # Объявляем секрет как переменную окружения
+          MY_SECRET: ${{ secrets.BYTESCALE_API_KEY }}
+        run: |
+          # Теперь секрет доступен через переменную окружения MY_SECRET
+          echo "The secret is being used here..."
+          # Например, можно передать переменную в скрипт
+          ./my-script.sh "$MY_SECRET"
