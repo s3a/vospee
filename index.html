@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>vospee - Загрузка аудио</title>
+    <title>vospee - GitHub Audio Processor</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -272,97 +272,45 @@
             line-height: 1.4;
         }
 
-        .timer-info {
+        .status-message {
             margin-top: 16px;
             padding: 12px;
-            background-color: rgba(51, 144, 236, 0.1);
             border-radius: 8px;
-            border-left: 4px solid var(--accent-color);
             font-size: 14px;
             display: none;
         }
 
-        .timer-info.active {
+        .status-message.success {
             display: block;
+            background-color: rgba(46, 213, 115, 0.1);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
         }
 
-        .timer-countdown {
-            font-weight: bold;
+        .status-message.error {
+            display: block;
+            background-color: rgba(255, 71, 87, 0.1);
+            border: 1px solid var(--error-color);
+            color: var(--error-color);
+        }
+
+        .status-message.info {
+            display: block;
+            background-color: rgba(51, 144, 236, 0.1);
+            border: 1px solid var(--accent-color);
             color: var(--accent-color);
         }
 
-        .uploaded-files {
-            margin-top: 24px;
-            display: none;
-        }
-
-        .uploaded-files.active {
-            display: block;
-        }
-
-        .file-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            margin-bottom: 8px;
+        .github-info {
             background-color: var(--secondary-bg);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-
-        .file-name {
-            flex: 1;
-            margin-right: 12px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .file-timer {
-            font-size: 12px;
-            color: #888;
-            margin-right: 12px;
-        }
-
-        .delete-btn {
-            padding: 6px 12px;
-            background-color: #ff4757;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin: 16px 0;
             padding: 12px;
-            background-color: var(--secondary-bg);
             border-radius: 8px;
-        }
-
-        .checkbox-group input[type="checkbox"] {
-            margin-right: 12px;
-            width: 18px;
-            height: 18px;
-            accent-color: var(--accent-color);
-        }
-
-        .checkbox-label {
-            font-size: 14px;
-            line-height: 1.4;
-        }
-
-        .feature-description {
+            margin-top: 20px;
             font-size: 12px;
             color: #666;
-            margin-top: 4px;
         }
 
-        [data-theme="dark"] .feature-description {
+        [data-theme="dark"] .github-info {
             color: #aaa;
         }
 
@@ -376,53 +324,19 @@
         .error-message.active {
             display: block;
         }
-
-        .success-message {
-            color: var(--success-color);
-            font-size: 12px;
-            margin-top: 4px;
-            display: none;
-        }
-
-        .success-message.active {
-            display: block;
-        }
-
-        .compression-info {
-            background-color: rgba(51, 144, 236, 0.1);
-            padding: 10px;
-            border-radius: 6px;
-            margin-top: 8px;
-            font-size: 12px;
-            display: none;
-        }
-
-        .compression-info.active {
-            display: block;
-        }
-
-        .compression-stats {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #666;
-        }
-
-        [data-theme="dark"] .compression-stats {
-            color: #aaa;
-        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="logo">
             <span class="logo-icon">🎵</span>
-            <span>vospee - Аудио</span>
+            <span>vospee - GitHub Audio</span>
         </div>
         <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">🌙</button>
     </div>
 
     <div class="instructions">
-        <p>Загрузите аудиофайл или укажите ссылку для обработки. После загрузки файла нажмите кнопку "Отправить", чтобы передать ссылку на файл в систему. Файлы будут автоматически удалены через 60 минут.</p>
+        <p>Загрузите аудиофайл для обработки через GitHub Actions. Файл будет обработан автоматически и результаты появятся в Issues репозитория.</p>
     </div>
 
     <!-- Селектор метода загрузки -->
@@ -436,7 +350,7 @@
         <!-- Загрузка файла -->
         <div class="form-section active" id="fileSection">
             <div class="form-group">
-                <label>Аудиофайл</label>
+                <label>Аудиофайл (макс. 25MB)</label>
                 <div class="file-upload">
                     <input type="file" id="audioFile" accept="audio/*">
                     <label for="audioFile" class="file-upload-label">
@@ -446,19 +360,6 @@
                 </div>
                 <div class="error-message" id="fileError"></div>
                 <div class="preview" id="audioPreview"></div>
-                
-                <!-- Опция сжатия -->
-                <div class="checkbox-group" id="compressionOption">
-                    <input type="checkbox" id="compressFile">
-                    <div class="checkbox-label">
-                        <div>Сжать файл перед загрузкой</div>
-                        <div class="feature-description">Включите эту опцию для сжатия аудиофайла через bytescale.com. Файл будет загружен на внешний сервер и сжат для экономии места.</div>
-                    </div>
-                </div>
-                <div class="compression-info" id="compressionInfo">
-                    <div><strong>Сжатие через bytescale.com</strong></div>
-                    <div class="compression-stats" id="compressionStats"></div>
-                </div>
             </div>
         </div>
 
@@ -472,56 +373,59 @@
             </div>
         </div>
         
-        <!-- Общие настройки -->
-        <div class="checkbox-group">
-            <input type="checkbox" id="transcribeWithTopics">
-            <div class="checkbox-label">
-                <div>Транскрибировать с выделением тем и таймкодами</div>
-                <div class="feature-description">Включите эту опцию для получения структурированной транскрипции с разбивкой по темам и временными метками. Это улучшит обработку контента нейросетями.</div>
-            </div>
+        <!-- Настройки обработки -->
+        <div class="form-group">
+            <label>Тип обработки</label>
+            <select class="url-input" id="processingType">
+                <option value="transcribe">Транскрипция</option>
+                <option value="transcribe_with_topics">Транскрипция с темами</option>
+                <option value="analyze">Анализ аудио</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Описание задачи (опционально)</label>
+            <textarea class="url-input" id="taskDescription" placeholder="Опишите, что нужно сделать с аудио..." rows="3"></textarea>
         </div>
         
-        <button class="submit-btn" id="audioSubmit">Отправить</button>
+        <button class="submit-btn" id="audioSubmit">Создать задачу в GitHub</button>
         
-        <div class="timer-info" id="timerInfo">
-            <p>Файл будет автоматически удален через <span class="timer-countdown" id="timerCountdown">60:00</span> минут.</p>
+        <div class="status-message info" id="infoMessage">
+            Файл будет обработан через GitHub Actions. Результаты появятся в Issues.
         </div>
+        
+        <div class="status-message" id="statusMessage"></div>
     </div>
 
-    <div class="uploaded-files" id="uploadedFiles">
-        <h3>Загруженные файлы</h3>
-        <div id="uploadedFilesList"></div>
+    <div class="github-info">
+        <strong>GitHub Integration:</strong> Для работы приложения необходим GitHub Personal Token с правами repo и workflow. Добавьте его в Secrets репозитория как GH_TOKEN.
     </div>
 
     <div class="loading" id="loadingIndicator">
         <div class="spinner"></div>
-        <p>Обработка запроса...</p>
+        <p>Создание задачи в GitHub...</p>
     </div>
 
     <script>
-        // Конфигурация приложения
+        // Конфигурация для GitHub-решения
         const CONFIG = {
-            webhookUrl: 'https://n8n.s3amat.ru/webhook-test/tghookVosp',
-            fileExpirationTime: 60 * 60 * 1000,
-            maxFileSize: 10 * 1024 * 1024,
-            allowedFileTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/webm'],
-            // Bytescale API для сжатия файлов
-            bytescaleApiKey: 'public_12a1yqk6GgYoWQ8h84dP53B4SfCE', // Публичный ключ для демо
-            bytescaleUploadUrl: 'https://api.bytescale.com/v1/accounts/12a1yqk/uploads/form_data'
+            // Эти значения будут подставляться из окружения GitHub Pages
+            repoOwner: 'ВАШ_USERNAME', // Замените на ваш username
+            repoName: 'ВАШ_REPOSITORY', // Замените на название репозитория
+            maxFileSize: 25 * 1024 * 1024, // 25MB (ограничение GitHub)
+            allowedFileTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/webm']
         };
 
         // Глобальные переменные
         let currentChatId = null;
-        let uploadedFiles = [];
-        let activeTimers = {};
         let currentMethod = 'file';
 
         // Инициализация приложения
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing app...');
+            console.log('GitHub Audio Processor initialized');
             
-            // Загружаем список файлов из localStorage
-            loadUploadedFiles();
+            // Автоматически определяем репозиторий из URL
+            autoDetectRepo();
             
             // Инициализируем Telegram Web App
             initTelegramWebApp();
@@ -533,8 +437,26 @@
             initUrlInput();
             initFormSubmission();
             
-            console.log('Audio upload app initialized successfully');
+            // Показываем информационное сообщение
+            document.getElementById('infoMessage').style.display = 'block';
         });
+
+        // Автоматическое определение репозитория
+        function autoDetectRepo() {
+            // Если размещено на GitHub Pages, пытаемся определить репозиторий из URL
+            if (window.location.hostname.includes('github.io')) {
+                const pathParts = window.location.pathname.split('/');
+                if (pathParts.length >= 3) {
+                    CONFIG.repoOwner = pathParts[1];
+                    CONFIG.repoName = pathParts[2];
+                    console.log('Auto-detected repository:', CONFIG.repoOwner + '/' + CONFIG.repoName);
+                }
+            }
+            
+            // Показываем информацию о репозитории в UI
+            const infoElement = document.querySelector('.github-info');
+            infoElement.innerHTML += `<br>Репозиторий: ${CONFIG.repoOwner}/${CONFIG.repoName}`;
+        }
 
         // Функция для получения chat_id из Telegram Web App
         function initTelegramWebApp() {
@@ -546,23 +468,6 @@
                     if (initDataUnsafe.chat) {
                         currentChatId = initDataUnsafe.chat.id;
                     } else if (initDataUnsafe.user) {
-                        currentChatId = initDataUnsafe.user.id;
-                    }
-                    
-                    if (!currentChatId && Telegram.WebApp.initData) {
-                        const params = new URLSearchParams(Telegram.WebApp.initData);
-                        const chatParam = params.get('chat');
-                        if (chatParam) {
-                            try {
-                                const chatData = JSON.parse(chatParam);
-                                currentChatId = chatData.id;
-                            } catch (e) {
-                                console.error('Error parsing chat data:', e);
-                            }
-                        }
-                    }
-                    
-                    if (!currentChatId && initDataUnsafe.user) {
                         currentChatId = initDataUnsafe.user.id;
                     }
                     
@@ -580,7 +485,7 @@
 
         function fallbackToDevMode() {
             const urlParams = new URLSearchParams(window.location.search);
-            currentChatId = urlParams.get('chat_id') || 'dev_chat_id';
+            currentChatId = urlParams.get('chat_id') || 'dev_chat_id_' + Date.now();
             console.log('Running in development mode. Chat ID:', currentChatId);
         }
 
@@ -589,11 +494,9 @@
             const themeToggle = document.getElementById('themeToggle');
             const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
             
-            // Проверяем сохраненную тему или системные настройки
             const currentTheme = localStorage.getItem('theme') || 
                                 (prefersDarkScheme.matches ? 'dark' : 'light');
             
-            // Применяем тему при загрузке
             applyTheme(currentTheme);
             
             themeToggle.addEventListener('click', () => {
@@ -624,11 +527,9 @@
                 tab.addEventListener('click', function() {
                     const method = this.getAttribute('data-method');
                     
-                    // Обновляем активные табы
                     tabs.forEach(t => t.classList.remove('active'));
                     this.classList.add('active');
                     
-                    // Показываем соответствующую секцию
                     fileSection.classList.remove('active');
                     urlSection.classList.remove('active');
                     
@@ -649,12 +550,9 @@
             const input = document.getElementById('audioFile');
             const preview = document.getElementById('audioPreview');
             const errorElement = document.getElementById('fileError');
-            const compressionOption = document.getElementById('compressionOption');
-            const compressionInfo = document.getElementById('compressionInfo');
             
             input.addEventListener('change', function() {
                 clearErrors();
-                compressionInfo.classList.remove('active');
                 
                 if (this.files && this.files[0]) {
                     const file = this.files[0];
@@ -663,12 +561,8 @@
                     if (!validation.isValid) {
                         showError(errorElement, validation.errors[0]);
                         preview.innerHTML = '';
-                        compressionOption.style.display = 'none';
                         return;
                     }
-                    
-                    // Показываем опцию сжатия для файлов
-                    compressionOption.style.display = 'flex';
                     
                     const reader = new FileReader();
                     
@@ -697,62 +591,31 @@
                     reader.readAsDataURL(file);
                 } else {
                     preview.innerHTML = '';
-                    compressionOption.style.display = 'none';
-                }
-            });
-            
-            // Обработчик для чекбокса сжатия
-            document.getElementById('compressFile').addEventListener('change', function() {
-                if (this.checked) {
-                    compressionInfo.classList.add('active');
-                    updateCompressionStats();
-                } else {
-                    compressionInfo.classList.remove('active');
                 }
             });
         }
 
-        function updateCompressionStats() {
-            const fileInput = document.getElementById('audioFile');
-            if (fileInput.files && fileInput.files[0]) {
-                const file = fileInput.files[0];
-                const originalSize = file.size;
-                // Примерная оценка сжатия (можно настроить точнее)
-                const compressedSize = Math.max(originalSize * 0.3, 100000); // 30% от оригинала, но не менее 100KB
-                const statsElement = document.getElementById('compressionStats');
-                statsElement.innerHTML = `
-                    <div>Исходный размер: ${(originalSize / 1024 / 1024).toFixed(2)} MB</div>
-                    <div>Ожидаемый размер после сжатия: ~${(compressedSize / 1024 / 1024).toFixed(2)} MB</div>
-                `;
-            }
-        }
-
-        // Инициализация ввода URL (без проверки)
+        // Инициализация ввода URL
         function initUrlInput() {
             const urlInput = document.getElementById('audioUrl');
             const preview = document.getElementById('urlPreview');
             const errorElement = document.getElementById('urlError');
             
-            // Валидация при вводе
             urlInput.addEventListener('input', () => {
                 clearErrors();
                 preview.innerHTML = '';
                 
                 const url = urlInput.value.trim();
                 if (url) {
-                    // Простая проверка URL
                     const validation = validateUrl(url);
                     if (validation.isValid) {
-                        // Создаем аудио элемент для предпрослушивания
                         const audioElement = document.createElement('audio');
                         audioElement.controls = true;
                         audioElement.src = url;
                         
                         const urlInfo = document.createElement('div');
                         urlInfo.className = 'url-info';
-                        urlInfo.innerHTML = `
-                            <div><strong>Ссылка на аудио</strong></div>
-                        `;
+                        urlInfo.innerHTML = `<div><strong>Ссылка на аудио</strong></div>`;
                         
                         preview.innerHTML = '';
                         preview.appendChild(audioElement);
@@ -791,7 +654,7 @@
             };
         }
 
-        // Валидация URL (только базовая проверка формата)
+        // Валидация URL
         function validateUrl(url) {
             const errors = [];
             
@@ -812,61 +675,98 @@
             };
         }
 
-        // Загрузка файла на bytescale.com для сжатия
-        async function uploadToBytescale(file) {
-            const formData = new FormData();
-            formData.append('file', file);
+        // Создание Issue в GitHub через GitHub API
+        async function createGitHubIssue(fileData, fileName, fileType) {
+            const processingType = document.getElementById('processingType').value;
+            const taskDescription = document.getElementById('taskDescription').value;
             
-            // Добавляем параметры для сжатия аудио
-            const params = new URLSearchParams({
-                'metadata': JSON.stringify({
-                    'audio': {
-                        'compression': 'enabled',
-                        'format': 'mp3',
-                        'quality': 'medium'
-                    }
-                })
-            });
+            const issueTitle = `Audio Processing: ${fileName || 'URL Audio'} [${currentChatId}]`;
             
-            const uploadUrl = `${CONFIG.bytescaleUploadUrl}?${params}`;
+            let issueBody = `## Audio Processing Request\n\n`;
+            issueBody += `- **Chat ID:** ${currentChatId}\n`;
+            issueBody += `- **Processing Type:** ${processingType}\n`;
+            issueBody += `- **Timestamp:** ${new Date().toISOString()}\n\n`;
             
-            const response = await fetch(uploadUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Authorization': `Bearer ${CONFIG.bytescaleApiKey}`
-                }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Ошибка загрузки на bytescale.com: ${response.status}`);
+            if (taskDescription) {
+                issueBody += `**Task Description:** ${taskDescription}\n\n`;
             }
             
-            const data = await response.json();
+            if (fileType === 'file') {
+                // Для файлов кодируем в base64 и добавляем в issue
+                issueBody += `### Audio File (Base64)\n`;
+                issueBody += `File name: ${fileName}\n\n`;
+                issueBody += '```base64\n';
+                issueBody += fileData.split(',')[1]; // Убираем data:audio/... префикс
+                issueBody += '\n```';
+            } else {
+                // Для URL просто добавляем ссылку
+                issueBody += `### Audio URL\n`;
+                issueBody += `${fileData}\n\n`;
+            }
             
-            // Возвращаем URL загруженного файла
-            return data.fileUrl || data.url;
+            const issueData = {
+                title: issueTitle,
+                body: issueBody,
+                labels: ['audio-processing', 'auto-generated']
+            };
+            
+            try {
+                // Используем GitHub API для создания Issue
+                const response = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repoName}/issues`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'token ' + (await getGitHubToken()),
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(issueData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                return result.html_url; // Возвращаем URL созданного issue
+                
+            } catch (error) {
+                console.error('Error creating GitHub issue:', error);
+                throw error;
+            }
+        }
+
+        // Получение GitHub Token (из localStorage или запрос у пользователя)
+        async function getGitHubToken() {
+            // Пытаемся получить токен из localStorage
+            let token = localStorage.getItem('github_token');
+            
+            if (!token) {
+                // Если токена нет, запрашиваем у пользователя
+                token = prompt('Введите ваш GitHub Personal Access Token (с правами repo):');
+                if (token) {
+                    localStorage.setItem('github_token', token);
+                } else {
+                    throw new Error('GitHub Token required');
+                }
+            }
+            
+            return token;
         }
 
         // Обработка отправки формы
         async function handleFormSubmission() {
             clearErrors();
+            clearStatus();
             
-            if (!currentChatId) {
-                showMessage('Chat ID не определен. Невозможно отправить запрос.', true);
+            if (!CONFIG.repoOwner || !CONFIG.repoName) {
+                showStatus('Ошибка: Не настроен репозиторий GitHub', 'error');
                 return;
             }
             
-            const formData = new FormData();
-            formData.append('chat_id', currentChatId);
-            formData.append('mode', 'audio_upload');
-            
-            const transcribeWithTopics = document.getElementById('transcribeWithTopics').checked;
-            formData.append('transcribe_with_topics', transcribeWithTopics);
+            let fileData, fileName, fileType;
             
             if (currentMethod === 'file') {
                 const audioFile = document.getElementById('audioFile').files[0];
-                const compressFile = document.getElementById('compressFile').checked;
                 
                 if (!audioFile) {
                     showError(document.getElementById('fileError'), 'Пожалуйста, выберите аудиофайл');
@@ -879,29 +779,12 @@
                     return;
                 }
                 
-                if (compressFile) {
-                    // Загружаем файл на bytescale.com для сжатия
-                    showLoading(true);
-                    try {
-                        const compressedUrl = await uploadToBytescale(audioFile);
-                        formData.append('audio_type', 'url');
-                        formData.append('audio_url', compressedUrl);
-                        formData.append('compressed', 'true');
-                        
-                        showMessage('Файл успешно сжат и загружен!');
-                    } catch (error) {
-                        console.error('Ошибка сжатия файла:', error);
-                        showMessage('Ошибка при сжатии файла. Пожалуйста, попробуйте без сжатия.', true);
-                        showLoading(false);
-                        return;
-                    }
-                } else {
-                    formData.append('audio_type', 'file');
-                    formData.append('audio_file', audioFile);
-                    formData.append('compressed', 'false');
-                }
+                // Читаем файл как Data URL
+                fileData = await readFileAsDataURL(audioFile);
+                fileName = audioFile.name;
+                fileType = 'file';
                 
-            } else { // URL method
+            } else {
                 const audioUrl = document.getElementById('audioUrl').value.trim();
                 
                 if (!audioUrl) {
@@ -915,210 +798,42 @@
                     return;
                 }
                 
-                formData.append('audio_type', 'url');
-                formData.append('audio_url', audioUrl);
-                formData.append('compressed', 'false');
+                fileData = audioUrl;
+                fileName = 'audio_from_url';
+                fileType = 'url';
             }
             
-            await sendToWebhook(formData);
-        }
-
-        // Отправка на вебхук
-        async function sendToWebhook(formData) {
             showLoading(true);
             
             try {
-                const response = await fetch(CONFIG.webhookUrl, {
-                    method: 'POST',
-                    body: formData
-                });
+                const issueUrl = await createGitHubIssue(fileData, fileName, fileType);
                 
-                if (response.ok) {
-                    showMessage('Данные успешно отправлены!');
-                    
-                    // Добавляем в историю
-                    if (currentMethod === 'file') {
-                        const audioFile = document.getElementById('audioFile').files[0];
-                        const compressFile = document.getElementById('compressFile').checked;
-                        
-                        if (compressFile) {
-                            // Для сжатых файлов сохраняем как ссылку
-                            const audioUrl = document.getElementById('audioUrl').value.trim();
-                            addUploadedFile(audioFile.name + ' (сжатый)', audioUrl, 'url');
-                        } else {
-                            const fileUrl = URL.createObjectURL(audioFile);
-                            addUploadedFile(audioFile.name, fileUrl, 'file');
-                        }
-                    } else {
-                        const audioUrl = document.getElementById('audioUrl').value.trim();
-                        addUploadedFile('Аудио по ссылке', audioUrl, 'url');
-                    }
-                    
-                    // Очищаем форму
-                    resetForm();
-                    
-                } else {
-                    throw new Error(`Ошибка сервера: ${response.status}`);
-                }
+                showStatus(`Задача успешно создана! <a href="${issueUrl}" target="_blank">Открыть Issue</a>`, 'success');
+                
+                // Очищаем форму
+                resetForm();
+                
             } catch (error) {
-                console.error('Ошибка при отправке:', error);
-                showMessage('Ошибка при отправке запроса', true);
+                console.error('Submission error:', error);
+                showStatus(`Ошибка при создании задачи: ${error.message}`, 'error');
+                
+                // Если ошибка аутентификации, удаляем токен
+                if (error.message.includes('401') || error.message.includes('token')) {
+                    localStorage.removeItem('github_token');
+                    showStatus('Неверный GitHub Token. Пожалуйста, обновите токен.', 'error');
+                }
             } finally {
                 showLoading(false);
             }
         }
 
-        // Функции для работы с загруженными файлами
-        function addUploadedFile(fileName, fileUrl, type = 'file') {
-            const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            const expiresAt = Date.now() + CONFIG.fileExpirationTime;
-            
-            const newFile = {
-                id: fileId,
-                name: fileName,
-                url: fileUrl,
-                type: type,
-                uploadedAt: Date.now(),
-                expiresAt: expiresAt
-            };
-            
-            uploadedFiles.push(newFile);
-            saveUploadedFiles();
-            renderUploadedFiles();
-            
-            if (type === 'file') {
-                startFileDeletionTimer(fileId, fileName);
-            }
-            
-            return fileId;
-        }
-
-        function startFileDeletionTimer(fileId, fileName) {
-            const timerInfo = document.getElementById('timerInfo');
-            const timerCountdown = document.getElementById('timerCountdown');
-            
-            timerInfo.classList.add('active');
-            
-            const updateInterval = setInterval(() => {
-                const file = uploadedFiles.find(f => f.id === fileId);
-                if (!file) {
-                    clearInterval(updateInterval);
-                    return;
-                }
-                
-                const timeLeft = file.expiresAt - Date.now();
-                if (timeLeft <= 0) {
-                    clearInterval(updateInterval);
-                    deleteFile(fileId);
-                    return;
-                }
-                
-                const minutes = Math.floor(timeLeft / 60000);
-                const seconds = Math.floor((timeLeft % 60000) / 1000);
-                timerCountdown.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-                
-                updateFileTimerDisplay(fileId, minutes, seconds);
-            }, 1000);
-            
-            activeTimers[fileId] = updateInterval;
-            
-            setTimeout(() => {
-                deleteFile(fileId);
-            }, CONFIG.fileExpirationTime);
-        }
-
-        function updateFileTimerDisplay(fileId, minutes, seconds) {
-            const fileElement = document.querySelector(`[data-file-id="${fileId}"] .file-timer`);
-            if (fileElement) {
-                fileElement.textContent = `Удаление через: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            }
-        }
-
-        function deleteFile(fileId) {
-            if (activeTimers[fileId]) {
-                clearInterval(activeTimers[fileId]);
-                delete activeTimers[fileId];
-            }
-            
-            uploadedFiles = uploadedFiles.filter(file => file.id !== fileId);
-            saveUploadedFiles();
-            renderUploadedFiles();
-            
-            if (uploadedFiles.length === 0) {
-                document.getElementById('timerInfo').classList.remove('active');
-            }
-        }
-
-        function saveUploadedFiles() {
-            const filesToSave = uploadedFiles.map(file => ({
-                ...file,
-                url: file.type === 'url' ? file.url : null
-            }));
-            localStorage.setItem('uploadedFiles', JSON.stringify(filesToSave));
-        }
-
-        function loadUploadedFiles() {
-            const savedFiles = localStorage.getItem('uploadedFiles');
-            if (savedFiles) {
-                const files = JSON.parse(savedFiles);
-                const now = Date.now();
-                
-                uploadedFiles = files.filter(file => {
-                    if (file.expiresAt > now && file.type === 'file') {
-                        startFileDeletionTimer(file.id, file.name);
-                        return true;
-                    } else if (file.type === 'url') {
-                        return true;
-                    }
-                    return false;
-                });
-                
-                saveUploadedFiles();
-                renderUploadedFiles();
-            }
-        }
-
-        function renderUploadedFiles() {
-            const container = document.getElementById('uploadedFiles');
-            const list = document.getElementById('uploadedFilesList');
-            
-            if (uploadedFiles.length === 0) {
-                container.classList.remove('active');
-                return;
-            }
-            
-            container.classList.add('active');
-            list.innerHTML = '';
-            
-            uploadedFiles.forEach(file => {
-                const fileElement = document.createElement('div');
-                fileElement.className = 'file-item';
-                fileElement.setAttribute('data-file-id', file.id);
-                
-                let timerHtml = '';
-                if (file.type === 'file') {
-                    const timeLeft = file.expiresAt - Date.now();
-                    const minutes = Math.floor(timeLeft / 60000);
-                    const seconds = Math.floor((timeLeft % 60000) / 1000);
-                    timerHtml = `<div class="file-timer">Удаление через: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}</div>`;
-                } else {
-                    timerHtml = '<div class="file-timer">Ссылка</div>';
-                }
-                
-                fileElement.innerHTML = `
-                    <div class="file-name">${file.name}</div>
-                    ${timerHtml}
-                    <button class="delete-btn" data-file-id="${file.id}">Удалить</button>
-                `;
-                
-                list.appendChild(fileElement);
-            });
-            
-            document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const fileId = this.getAttribute('data-file-id');
-                    deleteFile(fileId);
-                });
+        // Вспомогательная функция для чтения файла
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
             });
         }
 
@@ -1126,10 +841,6 @@
         function showError(element, message) {
             element.textContent = message;
             element.classList.add('active');
-            
-            if (element.id === 'urlError') {
-                document.getElementById('audioUrl').classList.add('error');
-            }
         }
 
         function clearErrors() {
@@ -1137,8 +848,18 @@
                 el.classList.remove('active');
                 el.textContent = '';
             });
-            
-            document.getElementById('audioUrl').classList.remove('error');
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.innerHTML = message;
+            statusElement.className = `status-message ${type}`;
+        }
+
+        function clearStatus() {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.className = 'status-message';
+            statusElement.innerHTML = '';
         }
 
         function showLoading(show) {
@@ -1150,23 +871,12 @@
             }
         }
 
-        function showMessage(message, isError = false) {
-            if (isError) {
-                alert(`Ошибка: ${message}`);
-            } else {
-                alert(message);
-            }
-        }
-
         function resetForm() {
             document.getElementById('audioFile').value = '';
             document.getElementById('audioUrl').value = '';
             document.getElementById('audioPreview').innerHTML = '';
             document.getElementById('urlPreview').innerHTML = '';
-            document.getElementById('transcribeWithTopics').checked = false;
-            document.getElementById('compressFile').checked = false;
-            document.getElementById('compressionOption').style.display = 'none';
-            document.getElementById('compressionInfo').classList.remove('active');
+            document.getElementById('taskDescription').value = '';
             clearErrors();
         }
     </script>
