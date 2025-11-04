@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+проанализируй код: <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -503,11 +503,11 @@
         const CONFIG = {
             webhookUrl: 'https://n8n.s3amat.ru/webhook-test/tghookVosp',
             fileExpirationTime: 60 * 60 * 1000,
-            maxFileSize: 150 * 1024 * 1024,
+            maxFileSize: 200 * 1024 * 1024,
             allowedFileTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/webm'],
             // Bytescale API для сжатия файлов
             bytescaleApiKey: 'public_G22nj222duMrt3KUgCFbvqHtk7f5', // Публичный ключ для демо
-            bytescaleUploadUrl: 'hhttps://api.bytescale.com/v2/accounts/G22nj22/uploads/binary'
+            bytescaleUploadUrl: 'https://api.bytescale.com/v2/accounts/G22nj22/uploads/binary'
         };
 
         // Глобальные переменные
@@ -897,7 +897,7 @@
                     }
                 } else {
                     formData.append('audio_type', 'file');
-                    formData.append('audio_file', audioFile);
+                    formData.append('audio_file', audioUrl.replace("raw","audio") + (audioUrl.includes('?') ? '&br=32' : '?br=32'));
                     formData.append('compressed', 'false');
                 }
                 
